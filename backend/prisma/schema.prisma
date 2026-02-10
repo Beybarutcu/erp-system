@@ -1,0 +1,561 @@
+// Prisma Schema - Plastic Injection ERP System
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT & AUTHENTICATION
+// ============================================
+
+model User {
+  id                String   @id @default(uuid())
+  username          String   @unique
+  email             String   @unique
+  passwordHash      String   @map("password_hash")
+  fullName          String?  @map("full_name")
+  role              UserRole
+  languagePreference String  @default("tr") @map("language_preference")
+  isActive          Boolean  @default(true) @map("is_active")
+  lastLogin         DateTime? @map("last_login")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  createdProducts   Product[] @relation("CreatedBy")
+  createdWorkOrders WorkOrder[] @relation("CreatedBy")
+  createdOrders     Order[] @relation("CreatedBy")
+  inventoryTransactions InventoryTransaction[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  workOrderOperations WorkOrderOperation[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  OPERATOR
+  VIEWER
+}
+
+model Permission {
+  id     String @id @default(uuid())
+  role   UserRole
+  module String
+  action String
+
+  @@unique([role, module, action])
+  @@map("permissions")
+}
+
+// ============================================
+// PRODUCTS & BOM
+// ============================================
+
+model Product {
+  id        String      @id @default(uuid())
+  code      String      @unique
+  type      ProductType
+  isStocked Boolean     @default(true) @map("is_stocked")
+  isActive  Boolean     @default(true) @map("is_active")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  createdBy String?     @map("created_by")
+
+  // Relations
+  creator           User? @relation("CreatedBy", fields: [createdBy], references: [id])
+  translations      ProductTranslation[]
+  bomParent         BomItem[] @relation("ParentProduct")
+  bomChild          BomItem[] @relation("ChildProduct")
+  inventoryLots     InventoryLot[]
+  workOrders        WorkOrder[]
+  orderItems        OrderItem[]
+
+  @@map("products")
+}
+
+enum ProductType {
+  RAW_MATERIAL
+  SEMI_FINISHED
+  FINISHED
+  MOLD
+  OUTSOURCED
+}
+
+model ProductTranslation {
+  id              String  @id @default(uuid())
+  productId       String  @map("product_id")
+  languageCode    String  @map("language_code")
+  name            String
+  description     String?
+  technicalSpecs  Json?   @map("technical_specs")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, languageCode])
+  @@map("product_translations")
+}
+
+model BomItem {
+  id                String   @id @default(uuid())
+  parentProductId   String   @map("parent_product_id")
+  childProductId    String   @map("child_product_id")
+  sequenceOrder     Int      @map("sequence_order")
+  quantity          Decimal  @db.Decimal(10, 4)
+  operationType     String?  @map("operation_type")
+  machineType       String?  @map("machine_type")
+  cycleTimeSeconds  Int?     @map("cycle_time_seconds")
+  setupTimeMinutes  Int?     @map("setup_time_minutes")
+  scrapRate         Decimal  @default(0) @db.Decimal(5, 2) @map("scrap_rate")
+  level             Int
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  parentProduct Product @relation("ParentProduct", fields: [parentProductId], references: [id], onDelete: Cascade)
+  childProduct  Product @relation("ChildProduct", fields: [childProductId], references: [id])
+  translations  BomOperationTranslation[]
+  workOrders    WorkOrder[]
+
+  @@unique([parentProductId, sequenceOrder])
+  @@index([parentProductId, level])
+  @@index([childProductId])
+  @@map("bom_items")
+}
+
+model BomOperationTranslation {
+  id            String @id @default(uuid())
+  bomItemId     String @map("bom_item_id")
+  languageCode  String @map("language_code")
+  operationName String? @map("operation_name")
+  notes         String?
+
+  bomItem BomItem @relation(fields: [bomItemId], references: [id], onDelete: Cascade)
+
+  @@unique([bomItemId, languageCode])
+  @@map("bom_operation_translations")
+}
+
+// ============================================
+// INVENTORY & FIFO
+// ============================================
+
+model InventoryLot {
+  id              String   @id @default(uuid())
+  lotNumber       String   @unique @map("lot_number")
+  productId       String   @map("product_id")
+  initialQuantity Decimal  @db.Decimal(10, 3) @map("initial_quantity")
+  currentQuantity Decimal  @db.Decimal(10, 3) @map("current_quantity")
+  receivedDate    DateTime @default(now()) @map("received_date")
+  locationCode    String?  @map("location_code")
+  status          LotStatus @default(ACTIVE)
+  supplierId      String?  @map("supplier_id")
+  workOrderId     String?  @map("work_order_id")
+  unitCost        Decimal? @db.Decimal(10, 4) @map("unit_cost")
+  expiryDate      DateTime? @map("expiry_date")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  product      Product @relation(fields: [productId], references: [id])
+  supplier     Supplier? @relation(fields: [supplierId], references: [id])
+  workOrder    WorkOrder? @relation(fields: [workOrderId], references: [id])
+  transactions InventoryTransaction[]
+  shipmentItems ShipmentItem[]
+
+  @@index([productId, receivedDate, status])
+  @@map("inventory_lots")
+}
+
+enum LotStatus {
+  ACTIVE
+  BLOCKED
+  OUTSOURCED
+  SCRAP
+}
+
+model InventoryTransaction {
+  id              String   @id @default(uuid())
+  lotId           String   @map("lot_id")
+  transactionType TransactionType @map("transaction_type")
+  quantity        Decimal  @db.Decimal(10, 3)
+  referenceType   String?  @map("reference_type")
+  referenceId     String?  @map("reference_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdBy       String?  @map("created_by")
+  notes           String?
+
+  // Relations
+  lot     InventoryLot @relation(fields: [lotId], references: [id])
+  creator User? @relation(fields: [createdBy], references: [id])
+
+  @@index([lotId, createdAt])
+  @@map("inventory_transactions")
+}
+
+enum TransactionType {
+  IN
+  OUT
+  ADJUST
+  TRANSFER
+}
+
+// ============================================
+// WORK ORDERS
+// ============================================
+
+model WorkOrder {
+  id                  String   @id @default(uuid())
+  woNumber            String   @unique @map("wo_number")
+  productId           String   @map("product_id")
+  bomItemId           String?  @map("bom_item_id")
+  orderId             String?  @map("order_id")
+  plannedQuantity     Decimal  @db.Decimal(10, 3) @map("planned_quantity")
+  producedQuantity    Decimal  @default(0) @db.Decimal(10, 3) @map("produced_quantity")
+  scrapQuantity       Decimal  @default(0) @db.Decimal(10, 3) @map("scrap_quantity")
+  status              WorkOrderStatus @default(PLANNED)
+  machineId           String?  @map("machine_id")
+  assignedUserId      String?  @map("assigned_user_id")
+  plannedStartDate    DateTime? @map("planned_start_date")
+  plannedEndDate      DateTime? @map("planned_end_date")
+  actualStartDate     DateTime? @map("actual_start_date")
+  actualEndDate       DateTime? @map("actual_end_date")
+  priority            Int      @default(5)
+  isOutsourced        Boolean  @default(false) @map("is_outsourced")
+  outsourceSupplierId String?  @map("outsource_supplier_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  createdBy           String?  @map("created_by")
+
+  // Relations
+  product          Product @relation(fields: [productId], references: [id])
+  bomItem          BomItem? @relation(fields: [bomItemId], references: [id])
+  order            Order? @relation(fields: [orderId], references: [id])
+  machine          Machine? @relation(fields: [machineId], references: [id])
+  assignedUser     User? @relation("CreatedBy", fields: [createdBy], references: [id])
+  outsourceSupplier Supplier? @relation(fields: [outsourceSupplierId], references: [id])
+  operations       WorkOrderOperation[]
+  inventoryLots    InventoryLot[]
+  outsourcingJobs  OutsourcingJob[]
+
+  @@index([status, plannedStartDate])
+  @@index([machineId, status])
+  @@map("work_orders")
+}
+
+enum WorkOrderStatus {
+  PLANNED
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+model WorkOrderOperation {
+  id                String   @id @default(uuid())
+  workOrderId       String   @map("work_order_id")
+  operationSequence Int      @map("operation_sequence")
+  quantityCompleted Decimal  @default(0) @db.Decimal(10, 3) @map("quantity_completed")
+  startTime         DateTime? @map("start_time")
+  endTime           DateTime? @map("end_time")
+  operatorId        String?  @map("operator_id")
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  operator  User? @relation(fields: [operatorId], references: [id])
+
+  @@map("work_order_operations")
+}
+
+// ============================================
+// MACHINES & CAPACITY
+// ============================================
+
+model Machine {
+  id               String   @id @default(uuid())
+  code             String   @unique
+  machineType      String   @map("machine_type")
+  capacityPerHour  Decimal? @db.Decimal(10, 2) @map("capacity_per_hour")
+  status           MachineStatus @default(ACTIVE)
+  location         String?
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  translations     MachineTranslation[]
+  shifts           MachineShift[]
+  maintenance      MachineMaintenance[]
+  workOrders       WorkOrder[]
+
+  @@map("machines")
+}
+
+enum MachineStatus {
+  ACTIVE
+  MAINTENANCE
+  BROKEN
+  INACTIVE
+}
+
+model MachineTranslation {
+  id           String @id @default(uuid())
+  machineId    String @map("machine_id")
+  languageCode String @map("language_code")
+  name         String
+  description  String?
+
+  machine Machine @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([machineId, languageCode])
+  @@map("machine_translations")
+}
+
+model MachineShift {
+  id         String   @id @default(uuid())
+  machineId  String   @map("machine_id")
+  dayOfWeek  Int      @map("day_of_week")
+  shiftName  String   @map("shift_name")
+  startTime  DateTime @map("start_time") @db.Time
+  endTime    DateTime @map("end_time") @db.Time
+  isActive   Boolean  @default(true) @map("is_active")
+
+  machine Machine @relation(fields: [machineId], references: [id])
+
+  @@map("machine_shifts")
+}
+
+model MachineMaintenance {
+  id              String   @id @default(uuid())
+  machineId       String   @map("machine_id")
+  maintenanceType String   @map("maintenance_type")
+  scheduledDate   DateTime @map("scheduled_date") @db.Date
+  completedDate   DateTime? @map("completed_date") @db.Date
+  durationHours   Int?     @map("duration_hours")
+  status          String   @default("PLANNED")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  machine Machine @relation(fields: [machineId], references: [id])
+
+  @@map("machine_maintenance")
+}
+
+// ============================================
+// ORDERS & CUSTOMERS
+// ============================================
+
+model Order {
+  id           String      @id @default(uuid())
+  orderNumber  String      @unique @map("order_number")
+  customerId   String      @map("customer_id")
+  orderDate    DateTime    @db.Date @map("order_date")
+  deliveryDate DateTime?   @db.Date @map("delivery_date")
+  status       OrderStatus @default(PENDING)
+  totalAmount  Decimal?    @db.Decimal(12, 2) @map("total_amount")
+  currency     String      @default("TRY")
+  notes        String?
+  createdAt    DateTime    @default(now()) @map("created_at")
+  createdBy    String?     @map("created_by")
+
+  // Relations
+  customer   Customer @relation(fields: [customerId], references: [id])
+  creator    User? @relation("CreatedBy", fields: [createdBy], references: [id])
+  items      OrderItem[]
+  workOrders WorkOrder[]
+  shipments  Shipment[]
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  IN_PRODUCTION
+  READY
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+model OrderItem {
+  id                String  @id @default(uuid())
+  orderId           String  @map("order_id")
+  productId         String  @map("product_id")
+  quantity          Decimal @db.Decimal(10, 3)
+  unitPrice         Decimal? @db.Decimal(10, 4) @map("unit_price")
+  deliveredQuantity Decimal @default(0) @db.Decimal(10, 3) @map("delivered_quantity")
+  notes             String?
+
+  // Relations
+  order         Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product @relation(fields: [productId], references: [id])
+  shipmentItems ShipmentItem[]
+
+  @@map("order_items")
+}
+
+model Customer {
+  id             String   @id @default(uuid())
+  code           String   @unique
+  name           String
+  contactPerson  String?  @map("contact_person")
+  email          String?
+  phone          String?
+  address        String?
+  taxNumber      String?  @map("tax_number")
+  paymentTerms   Int?     @map("payment_terms")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  orders    Order[]
+  shipments Shipment[]
+
+  @@map("customers")
+}
+
+// ============================================
+// SUPPLIERS & OUTSOURCING
+// ============================================
+
+model Supplier {
+  id            String       @id @default(uuid())
+  code          String       @unique
+  name          String
+  type          SupplierType
+  contactPerson String?      @map("contact_person")
+  email         String?
+  phone         String?
+  address       String?
+  taxNumber     String?      @map("tax_number")
+  leadTimeDays  Int?         @map("lead_time_days")
+  isActive      Boolean      @default(true) @map("is_active")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  inventoryLots   InventoryLot[]
+  workOrders      WorkOrder[]
+  outsourcingJobs OutsourcingJob[]
+
+  @@map("suppliers")
+}
+
+enum SupplierType {
+  MATERIAL
+  OUTSOURCING
+  BOTH
+}
+
+model OutsourcingJob {
+  id                 String   @id @default(uuid())
+  workOrderId        String   @map("work_order_id")
+  supplierId         String   @map("supplier_id")
+  sentQuantity       Decimal  @db.Decimal(10, 3) @map("sent_quantity")
+  receivedQuantity   Decimal  @default(0) @db.Decimal(10, 3) @map("received_quantity")
+  scrapQuantity      Decimal  @default(0) @db.Decimal(10, 3) @map("scrap_quantity")
+  sentDate           DateTime? @db.Date @map("sent_date")
+  expectedReturnDate DateTime? @db.Date @map("expected_return_date")
+  actualReturnDate   DateTime? @db.Date @map("actual_return_date")
+  status             String   @default("SENT")
+  unitCost           Decimal? @db.Decimal(10, 4) @map("unit_cost")
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  // Relations
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  supplier  Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("outsourcing_jobs")
+}
+
+// ============================================
+// SHIPPING
+// ============================================
+
+model Shipment {
+  id             String         @id @default(uuid())
+  shipmentNumber String         @unique @map("shipment_number")
+  orderId        String?        @map("order_id")
+  customerId     String         @map("customer_id")
+  shipmentDate   DateTime       @db.Date @map("shipment_date")
+  carrier        String?
+  trackingNumber String?        @map("tracking_number")
+  status         ShipmentStatus @default(PREPARED)
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  createdBy      String?        @map("created_by")
+
+  // Relations
+  order    Order? @relation(fields: [orderId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  items    ShipmentItem[]
+
+  @@map("shipments")
+}
+
+enum ShipmentStatus {
+  PREPARED
+  SHIPPED
+  DELIVERED
+}
+
+model ShipmentItem {
+  id          String  @id @default(uuid())
+  shipmentId  String  @map("shipment_id")
+  orderItemId String? @map("order_item_id")
+  lotId       String  @map("lot_id")
+  quantity    Decimal @db.Decimal(10, 3)
+
+  // Relations
+  shipment  Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id])
+  lot       InventoryLot @relation(fields: [lotId], references: [id])
+
+  @@map("shipment_items")
+}
+
+// ============================================
+// NOTIFICATIONS & AUDIT
+// ============================================
+
+model Notification {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  type          String
+  severity      String
+  messageKey    String   @map("message_key")
+  messageParams Json?    @map("message_params")
+  referenceType String?  @map("reference_type")
+  referenceId   String?  @map("reference_id")
+  isRead        Boolean  @default(false) @map("is_read")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  tableName  String   @map("table_name")
+  recordId   String?  @map("record_id")
+  action     String
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([tableName, recordId])
+  @@map("audit_logs")
+}
