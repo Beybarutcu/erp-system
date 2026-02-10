@@ -1,9 +1,7 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/inventory/page": "app/dashboard/inventory/page.js",
-  "/dashboard/bom/page": "app/dashboard/bom/page.js",
-  "/dashboard/work-orders/page": "app/dashboard/work-orders/page.js",
   "/dashboard/machines/page": "app/dashboard/machines/page.js",
-  "/dashboard/capacity/page": "app/dashboard/capacity/page.js"
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/capacity/page": "app/dashboard/capacity/page.js",
+  "/dashboard/products/page": "app/dashboard/products/page.js",
+  "/dashboard/inventory/page": "app/dashboard/inventory/page.js"
 }
