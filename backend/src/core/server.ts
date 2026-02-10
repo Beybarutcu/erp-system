@@ -24,12 +24,12 @@ import inventoryRoutes from '@modules/inventory/inventory.routes';
 import workOrderRoutes from '@modules/work-orders/work-orders.routes';
 import machineRoutes from '@modules/machines/machines.routes';
 import capacityRoutes from '@modules/capacity/capacity.routes';
-import orderRoutes from '@modules/orders/orders.routes';
-import supplierRoutes from '@modules/suppliers/suppliers.routes';
-import outsourcingRoutes from '@modules/outsourcing/outsourcing.routes';
-import shippingRoutes from '@modules/shipping/shipping.routes';
-import reportingRoutes from '@modules/reporting/reporting.routes';
-import notificationRoutes from '@modules/notifications/notifications.routes';
+// import orderRoutes from '@modules/orders/orders.routes';
+// import supplierRoutes from '@modules/suppliers/suppliers.routes';
+// import outsourcingRoutes from '@modules/outsourcing/outsourcing.routes';
+// import shippingRoutes from '@modules/shipping/shipping.routes';
+// import reportingRoutes from '@modules/reporting/reporting.routes';
+// import notificationRoutes from '@modules/notifications/notifications.routes';
 
 // Import websocket handlers
 import { setupWebSocket } from '@shared/utils/websocket';
@@ -91,12 +91,12 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/work-orders', workOrderRoutes);
 app.use('/api/machines', machineRoutes);
 app.use('/api/capacity', capacityRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/suppliers', supplierRoutes);
-app.use('/api/outsourcing', outsourcingRoutes);
-app.use('/api/shipping', shippingRoutes);
-app.use('/api/reporting', reportingRoutes);
-app.use('/api/notifications', notificationRoutes);
+// app.use('/api/orders', orderRoutes);
+// app.use('/api/suppliers', supplierRoutes);
+// app.use('/api/outsourcing', outsourcingRoutes);
+// app.use('/api/shipping', shippingRoutes);
+// app.use('/api/reporting', reportingRoutes);
+// app.use('/api/notifications', notificationRoutes);
 
 // ============================================
 // ERROR HANDLING
@@ -132,3 +132,4 @@ process.on('SIGTERM', () => {
 });
 
 export default app;
+

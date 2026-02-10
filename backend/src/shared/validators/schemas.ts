@@ -182,7 +182,7 @@ export const createMachineSchema = z.object({
 
 export const updateMachineSchema = createMachineSchema.partial();
 
-export const scheduleMaintenance Schema = z.object({
+export const scheduleMaintenanceSchema = z.object({
   maintenanceType: z.enum(['PREVENTIVE', 'BREAKDOWN']),
   scheduledDate: z.string().datetime(),
   durationHours: z.number().int().positive(),
