@@ -735,10 +735,15 @@ async function main() {
     'work_orders',
     'inventory',
     'orders',
+    'purchase_orders',
     'quality',
     'reports',
     'machines',
     'warehouse',
+    'molds',
+    'quality',
+    'personnel',
+    'samples',
   ];
   const actions = ['view', 'create', 'edit', 'delete'];
 

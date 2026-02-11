@@ -21,16 +21,23 @@ import authRoutes from '@modules/auth/auth.routes';
 import productRoutes from '@modules/products/products.routes';
 import bomRoutes from '@modules/bom/bom.routes';
 import inventoryRoutes from '@modules/inventory/inventory.routes';
+import warehouseRoutes from '@modules/warehouse/warehouse.routes';
 import workOrderRoutes from '@modules/work-orders/work-orders.routes';
 import machineRoutes from '@modules/machines/machines.routes';
 import capacityRoutes from '@modules/capacity/capacity.routes';
 import customersRoutes from '@modules/customers/customers.routes';
 import orderRoutes from '@modules/orders/orders.routes';
 import supplierRoutes from '@modules/suppliers/suppliers.routes';
+import purchaseOrdersRoutes from '@modules/purchase-orders/purchase-orders.routes';
 import outsourcingRoutes from '@modules/outsourcing/outsourcing.routes';
 import shippingRoutes from '@modules/shipping/shipping.routes';
 import reportingRoutes from '@modules/reporting/reporting.routes';
 import notificationRoutes from '@modules/notifications/notifications.routes';
+import moldsRoutes from '@modules/molds/molds.routes';
+import qualityRoutes from '@modules/quality/quality.routes';
+import stockRevisionRoutes from '@modules/stock-revision/stock-revision.routes';
+import personnelRoutes from '@modules/personnel/personnel.routes';
+import samplesRoutes from '@modules/samples/samples.routes';
 
 // Import websocket handlers
 import { setupWebSocket } from '@shared/utils/websocket';
@@ -89,16 +96,23 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/bom', bomRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/warehouse', warehouseRoutes);
 app.use('/api/work-orders', workOrderRoutes);
 app.use('/api/machines', machineRoutes);
 app.use('/api/capacity', capacityRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/purchase-orders', purchaseOrdersRoutes);
 app.use('/api/outsourcing', outsourcingRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/reporting', reportingRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/molds', moldsRoutes);
+app.use('/api/quality', qualityRoutes);
+app.use('/api/stock-revision', stockRevisionRoutes);
+app.use('/api/personnel', personnelRoutes);
+app.use('/api/samples', samplesRoutes);
 
 // ============================================
 // ERROR HANDLING
