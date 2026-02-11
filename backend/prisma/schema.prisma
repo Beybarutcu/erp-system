@@ -76,6 +76,7 @@ model Product {
   inventoryLots     InventoryLot[]
   workOrders        WorkOrder[]
   orderItems        OrderItem[]
+  outsourcingJobs    OutsourcingJob[] 
 
   @@map("products")
 }
@@ -495,7 +496,7 @@ model Shipment {
   orderId        String?        @map("order_id")
   customerId     String         @map("customer_id")
   shipmentDate   DateTime       @db.Date @map("shipment_date")
-  deliveredDate  DateTime?      @db.Date @map("delivered_date")  // ← EKLE
+  deliveredDate  DateTime?      @db.Date @map("delivered_date")
   carrier        String?
   trackingNumber String?        @map("tracking_number")
   status         ShipmentStatus @default(PENDING)  // ← PENDING yap
@@ -512,11 +513,11 @@ model Shipment {
 }
 
 enum ShipmentStatus {
-  PENDING      // ← EKLE
+  PENDING
   PREPARED
   SHIPPED
   DELIVERED
-  CANCELLED    // ← EKLE
+  CANCELLED
 }
 
 model ShipmentItem {

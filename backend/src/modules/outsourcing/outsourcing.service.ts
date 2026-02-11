@@ -173,36 +173,36 @@ export class OutsourcingService {
       throw new AppError('Outsourcing job not found', 404);
     }
 
-    // Calculate new total cost if quantity or unit cost changed
-    let totalCost = existing.totalCost;
-    if (data.quantity || data.unitCost) {
-      const newQuantity = data.quantity || Number(existing.quantity);
-      const newUnitCost = data.unitCost !== undefined ? data.unitCost : Number(existing.unitCost);
-      totalCost = newQuantity * newUnitCost;
-    }
+  // Calculate new total cost if quantity or unit cost changed
+  let totalCost = Number(existing.totalCost);
+  if (data.quantity || data.unitCost) {
+    const newQuantity = data.quantity || Number(existing.quantity);
+    const newUnitCost = data.unitCost !== undefined ? data.unitCost : Number(existing.unitCost);
+    totalCost = newQuantity * newUnitCost;
+  }
 
-    const job = await prisma.outsourcingJob.update({
-      where: { id },
-      data: {
-        quantity: data.quantity,
-        unitCost: data.unitCost,
-        totalCost,
-        startDate: data.startDate,
-        expectedEndDate: data.expectedEndDate,
-        actualEndDate: data.actualEndDate,
-        receivedQuantity: data.receivedQuantity,
-        notes: data.notes,
-        status: data.status as any,
-      },
-      include: {
-        supplier: true,
-        product: {
-          include: {
-            translations: true,
-          },
+  const job = await prisma.outsourcingJob.update({
+    where: { id },
+    data: {
+      quantity: data.quantity,
+      unitCost: data.unitCost,
+      totalCost,  // ← Prisma otomatik Decimal'e çevirir
+      startDate: data.startDate,
+      expectedEndDate: data.expectedEndDate,
+      actualEndDate: data.actualEndDate,
+      receivedQuantity: data.receivedQuantity,
+      notes: data.notes,
+      status: data.status as any,
+    },
+    include: {
+      supplier: true,
+      product: {
+        include: {
+          translations: true,
         },
       },
-    });
+    },
+  });
 
     await cache.deletePattern('outsourcing:*');
 

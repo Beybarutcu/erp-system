@@ -27,10 +27,10 @@ import capacityRoutes from '@modules/capacity/capacity.routes';
 import customersRoutes from '@modules/customers/customers.routes';
 import orderRoutes from '@modules/orders/orders.routes';
 import supplierRoutes from '@modules/suppliers/suppliers.routes';
-// import outsourcingRoutes from '@modules/outsourcing/outsourcing.routes';
-// import shippingRoutes from '@modules/shipping/shipping.routes';
+import outsourcingRoutes from '@modules/outsourcing/outsourcing.routes';
+import shippingRoutes from '@modules/shipping/shipping.routes';
 import reportingRoutes from '@modules/reporting/reporting.routes';
-// import notificationRoutes from '@modules/notifications/notifications.routes';
+import notificationRoutes from '@modules/notifications/notifications.routes';
 
 // Import websocket handlers
 import { setupWebSocket } from '@shared/utils/websocket';
@@ -95,10 +95,10 @@ app.use('/api/capacity', capacityRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/suppliers', supplierRoutes);
-// app.use('/api/outsourcing', outsourcingRoutes);
-// app.use('/api/shipping', shippingRoutes);
+app.use('/api/outsourcing', outsourcingRoutes);
+app.use('/api/shipping', shippingRoutes);
 app.use('/api/reporting', reportingRoutes);
-// app.use('/api/notifications', notificationRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ============================================
 // ERROR HANDLING
