@@ -24,11 +24,12 @@ import inventoryRoutes from '@modules/inventory/inventory.routes';
 import workOrderRoutes from '@modules/work-orders/work-orders.routes';
 import machineRoutes from '@modules/machines/machines.routes';
 import capacityRoutes from '@modules/capacity/capacity.routes';
-// import orderRoutes from '@modules/orders/orders.routes';
-// import supplierRoutes from '@modules/suppliers/suppliers.routes';
+import customersRoutes from '@modules/customers/customers.routes';
+import orderRoutes from '@modules/orders/orders.routes';
+import supplierRoutes from '@modules/suppliers/suppliers.routes';
 // import outsourcingRoutes from '@modules/outsourcing/outsourcing.routes';
 // import shippingRoutes from '@modules/shipping/shipping.routes';
-// import reportingRoutes from '@modules/reporting/reporting.routes';
+import reportingRoutes from '@modules/reporting/reporting.routes';
 // import notificationRoutes from '@modules/notifications/notifications.routes';
 
 // Import websocket handlers
@@ -65,7 +66,7 @@ app.use(compression());
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 } else {
-  app.use(morgan('combined', { stream: logger.stream }));
+  app.use(morgan('combined'));
 }
 
 // Rate limiting
@@ -75,7 +76,7 @@ app.use('/api/', rateLimiter);
 // ROUTES
 // ============================================
 
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -91,11 +92,12 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/work-orders', workOrderRoutes);
 app.use('/api/machines', machineRoutes);
 app.use('/api/capacity', capacityRoutes);
-// app.use('/api/orders', orderRoutes);
-// app.use('/api/suppliers', supplierRoutes);
+app.use('/api/customers', customersRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/suppliers', supplierRoutes);
 // app.use('/api/outsourcing', outsourcingRoutes);
 // app.use('/api/shipping', shippingRoutes);
-// app.use('/api/reporting', reportingRoutes);
+app.use('/api/reporting', reportingRoutes);
 // app.use('/api/notifications', notificationRoutes);
 
 // ============================================
@@ -132,4 +134,3 @@ process.on('SIGTERM', () => {
 });
 
 export default app;
-
