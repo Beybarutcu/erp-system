@@ -1,228 +1,382 @@
-import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+// API base URL - update this to match your backend
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
-class ApiClient {
-  private client: AxiosInstance;
+// Create axios instance with default config
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
-  constructor() {
-    this.client = axios.create({
-      baseURL: `${API_URL}/api`,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000,
-    });
-
-    this.setupInterceptors();
-  }
-
-  private setupInterceptors() {
-    // Request interceptor
-    this.client.interceptors.request.use(
-      (config) => {
-        const token = this.getToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
-
-    // Response interceptor
-    this.client.interceptors.response.use(
-      (response) => response,
-      async (error: AxiosError) => {
-        if (error.response?.status === 401) {
-          // Token expired, try to refresh
-          const refreshed = await this.refreshToken();
-          if (refreshed && error.config) {
-            return this.client.request(error.config);
-          }
-          // Redirect to login
-          this.clearToken();
-          window.location.href = '/login';
-        }
-        return Promise.reject(error);
-      }
-    );
-  }
-
-  private getToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('accessToken');
+// Request interceptor to add auth token
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    return null;
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
+);
 
-  private getRefreshToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('refreshToken');
+// Response interceptor for error handling
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Redirect to login if unauthorized
+      localStorage.removeItem("token");
+      window.location.href = "/login";
     }
-    return null;
+    return Promise.reject(error);
   }
+);
 
-  setToken(accessToken: string, refreshToken?: string) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('accessToken', accessToken);
-      if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken);
-      }
-    }
-  }
-
-  clearToken() {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-    }
-  }
-
-  private async refreshToken(): Promise<boolean> {
-    try {
-      const refreshToken = this.getRefreshToken();
-      if (!refreshToken) return false;
-
-      const response = await axios.post(`${API_URL}/api/auth/refresh`, {
-        refreshToken,
-      });
-
-      if (response.data.success) {
-        this.setToken(response.data.data.accessToken, response.data.data.refreshToken);
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  }
-
-  // Generic request methods
-  async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.get<T>(url, config);
-    return response.data;
-  }
-
-  async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.post<T>(url, data, config);
-    return response.data;
-  }
-
-  async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.put<T>(url, data, config);
-    return response.data;
-  }
-
-  async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.delete<T>(url, config);
-    return response.data;
-  }
-}
-
-export const apiClient = new ApiClient();
-
-// API Services
-export const authApi = {
-  login: (username: string, password: string) =>
-    apiClient.post('/auth/login', { username, password }),
-  
-  logout: () => apiClient.post('/auth/logout'),
-  
-  me: () => apiClient.get('/auth/me'),
-  
-  changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    apiClient.put('/auth/change-password', data),
-};
-
+// ==================== PRODUCTS API ====================
 export const productsApi = {
-  getAll: (params?: any) => apiClient.get('/products', { params }),
+  getAll: async (params?: any) => {
+    const response = await apiClient.get("/products", { params });
+    return response.data;
+  },
   
-  getById: (id: string) => apiClient.get(`/products/${id}`),
+  getById: async (id: string) => {
+    const response = await apiClient.get(`/products/${id}`);
+    return response.data;
+  },
   
-  create: (data: any) => apiClient.post('/products', data),
+  create: async (data: any) => {
+    const response = await apiClient.post("/products", data);
+    return response.data;
+  },
   
-  update: (id: string, data: any) => apiClient.put(`/products/${id}`, data),
+  update: async (id: string, data: any) => {
+    const response = await apiClient.put(`/products/${id}`, data);
+    return response.data;
+  },
   
-  delete: (id: string) => apiClient.delete(`/products/${id}`),
-  
-  search: (query: string) => apiClient.get('/products/search', { params: { q: query } }),
+  delete: async (id: string) => {
+    const response = await apiClient.delete(`/products/${id}`);
+    return response.data;
+  },
 };
 
-export const bomApi = {
-  getTree: (productId: string) => apiClient.get(`/bom/products/${productId}/bom/tree`),
-  
-  explode: (productId: string, quantity: number) =>
-    apiClient.post(`/bom/products/${productId}/bom/explode`, { quantity }),
-  
-  create: (productId: string, data: any) =>
-    apiClient.post(`/bom/products/${productId}/bom`, data),
-  
-  generateWorkOrders: (productId: string, data: any) =>
-    apiClient.post(`/bom/products/${productId}/bom/generate-work-orders`, data),
-};
-
-export const inventoryApi = {
-  getLots: (params?: any) => apiClient.get('/inventory/lots', { params }),
-  
-  getAvailable: (params?: any) => apiClient.get('/inventory/available', { params }),
-  
-  consumeStock: (data: any) => apiClient.post('/inventory/consume', data),
-  
-  getAging: (params?: any) => apiClient.get('/inventory/aging', { params }),
-  
-  createLot: (data: any) => apiClient.post('/inventory/lots', data),
-};
-
+// ==================== WORK ORDERS API ====================
 export const workOrdersApi = {
-  getAll: (params?: any) => apiClient.get('/work-orders', { params }),
+  getAll: async (params?: any) => {
+    const response = await apiClient.get("/work-orders", { params });
+    return response.data;
+  },
   
-  getById: (id: string) => apiClient.get(`/work-orders/${id}`),
+  getById: async (id: string) => {
+    const response = await apiClient.get(`/work-orders/${id}`);
+    return response.data;
+  },
   
-  create: (data: any) => apiClient.post('/work-orders', data),
+  create: async (data: any) => {
+    const response = await apiClient.post("/work-orders", data);
+    return response.data;
+  },
   
-  start: (id: string, data?: any) => apiClient.post(`/work-orders/${id}/start`, data),
+  update: async (id: string, data: any) => {
+    const response = await apiClient.put(`/work-orders/${id}`, data);
+    return response.data;
+  },
   
-  recordProduction: (id: string, data: any) =>
-    apiClient.post(`/work-orders/${id}/record-production`, data),
+  recordProduction: async (data: any) => {
+    const response = await apiClient.post("/work-orders/record-production", data);
+    return response.data;
+  },
   
-  pause: (id: string, reason?: string) =>
-    apiClient.post(`/work-orders/${id}/pause`, { reason }),
-  
-  resume: (id: string) => apiClient.post(`/work-orders/${id}/resume`),
-  
-  complete: (id: string) => apiClient.post(`/work-orders/${id}/complete`),
-  
-  getTimeline: (id: string) => apiClient.get(`/work-orders/${id}/timeline`),
+  updateStatus: async (id: string, status: string) => {
+    const response = await apiClient.patch(`/work-orders/${id}/status`, { status });
+    return response.data;
+  },
 };
 
-export const machinesApi = {
-  getAll: (params?: any) => apiClient.get('/machines', { params }),
+// ==================== INVENTORY API ====================
+export const inventoryApi = {
+  getLots: async (params?: any) => {
+    const response = await apiClient.get("/inventory/lots", { params });
+    return response.data;
+  },
   
-  getById: (id: string) => apiClient.get(`/machines/${id}`),
+  getLotById: async (id: string) => {
+    const response = await apiClient.get(`/inventory/lots/${id}`);
+    return response.data;
+  },
   
-  getUtilization: (id: string, params: any) =>
-    apiClient.get(`/machines/${id}/utilization`, { params }),
+  consumeStock: async (data: any) => {
+    const response = await apiClient.post("/inventory/consume", data);
+    return response.data;
+  },
   
-  getSchedule: (id: string, params: any) =>
-    apiClient.get(`/machines/${id}/schedule`, { params }),
+  transferStock: async (data: any) => {
+    const response = await apiClient.post("/inventory/transfer", data);
+    return response.data;
+  },
   
-  create: (data: any) => apiClient.post('/machines', data),
-  
-  update: (id: string, data: any) => apiClient.put(`/machines/${id}`, data),
-  
-  scheduleMaintenance: (id: string, data: any) =>
-    apiClient.post(`/machines/${id}/maintenance`, data),
+  getMovements: async (params?: any) => {
+    const response = await apiClient.get("/inventory/movements", { params });
+    return response.data;
+  },
 };
 
-export const capacityApi = {
-  getOverview: (params: { startDate: string; endDate: string }) =>
-    apiClient.get('/capacity/overview', { params }),
+// ==================== BOM API ====================
+export const bomApi = {
+  getAll: async (params?: any) => {
+    const response = await apiClient.get("/bom", { params });
+    return response.data;
+  },
   
-  getForecast: (days: number = 30) =>
-    apiClient.get('/capacity/forecast', { params: { days } }),
+  getByProductId: async (productId: string) => {
+    const response = await apiClient.get(`/bom/product/${productId}`);
+    return response.data;
+  },
   
-  calculate: (data: any) => apiClient.post('/capacity/calculate', data),
+  create: async (data: any) => {
+    const response = await apiClient.post("/bom", data);
+    return response.data;
+  },
+  
+  update: async (id: string, data: any) => {
+    const response = await apiClient.put(`/bom/${id}`, data);
+    return response.data;
+  },
+  
+  delete: async (id: string) => {
+    const response = await apiClient.delete(`/bom/${id}`);
+    return response.data;
+  },
+};
+
+// ==================== WAREHOUSE API ====================
+export const warehouseApi = {
+  getLocations: async (params?: any) => {
+    const response = await apiClient.get("/warehouse/locations", { params });
+    return response.data;
+  },
+  
+  getLocationById: async (id: string) => {
+    const response = await apiClient.get(`/warehouse/locations/${id}`);
+    return response.data;
+  },
+  
+  createLocation: async (data: any) => {
+    const response = await apiClient.post("/warehouse/locations", data);
+    return response.data;
+  },
+  
+  updateLocation: async (id: string, data: any) => {
+    const response = await apiClient.put(`/warehouse/locations/${id}`, data);
+    return response.data;
+  },
+  
+  deleteLocation: async (id: string) => {
+    const response = await apiClient.delete(`/warehouse/locations/${id}`);
+    return response.data;
+  },
+};
+
+// ==================== PURCHASE ORDERS API ====================
+export const purchaseOrdersApi = {
+  getAll: async (params?: any) => {
+    const response = await apiClient.get("/purchase-orders", { params });
+    return response.data;
+  },
+  
+  getById: async (id: string) => {
+    const response = await apiClient.get(`/purchase-orders/${id}`);
+    return response.data;
+  },
+  
+  create: async (data: any) => {
+    const response = await apiClient.post("/purchase-orders", data);
+    return response.data;
+  },
+  
+  update: async (id: string, data: any) => {
+    const response = await apiClient.put(`/purchase-orders/${id}`, data);
+    return response.data;
+  },
+  
+  updateStatus: async (id: string, status: string) => {
+    const response = await apiClient.patch(`/purchase-orders/${id}/status`, { status });
+    return response.data;
+  },
+  
+  receiveItems: async (id: string, data: any) => {
+    const response = await apiClient.post(`/purchase-orders/${id}/receive`, data);
+    return response.data;
+  },
+};
+
+// ==================== MOLDS API ====================
+export const moldsApi = {
+  getAll: async (params?: any) => {
+    const response = await apiClient.get("/molds", { params });
+    return response.data;
+  },
+  
+  getById: async (id: string) => {
+    const response = await apiClient.get(`/molds/${id}`);
+    return response.data;
+  },
+  
+  create: async (data: any) => {
+    const response = await apiClient.post("/molds", data);
+    return response.data;
+  },
+  
+  update: async (id: string, data: any) => {
+    const response = await apiClient.put(`/molds/${id}`, data);
+    return response.data;
+  },
+  
+  recordShots: async (id: string, shots: number) => {
+    const response = await apiClient.post(`/molds/${id}/record-shots`, { shots });
+    return response.data;
+  },
+  
+  scheduleMaintenance: async (id: string, data: any) => {
+    const response = await apiClient.post(`/molds/${id}/maintenance`, data);
+    return response.data;
+  },
+};
+
+// ==================== QUALITY API ====================
+export const qualityApi = {
+  getInspections: async (params?: any) => {
+    const response = await apiClient.get("/quality/inspections", { params });
+    return response.data;
+  },
+  
+  getInspectionById: async (id: string) => {
+    const response = await apiClient.get(`/quality/inspections/${id}`);
+    return response.data;
+  },
+  
+  createInspection: async (data: any) => {
+    const response = await apiClient.post("/quality/inspections", data);
+    return response.data;
+  },
+  
+  updateInspection: async (id: string, data: any) => {
+    const response = await apiClient.put(`/quality/inspections/${id}`, data);
+    return response.data;
+  },
+  
+  recordResults: async (id: string, data: any) => {
+    const response = await apiClient.post(`/quality/inspections/${id}/results`, data);
+    return response.data;
+  },
+};
+
+// ==================== PERSONNEL API ====================
+export const personnelApi = {
+  getAll: async (params?: any) => {
+    const response = await apiClient.get("/personnel", { params });
+    return response.data;
+  },
+  
+  getById: async (id: string) => {
+    const response = await apiClient.get(`/personnel/${id}`);
+    return response.data;
+  },
+  
+  create: async (data: any) => {
+    const response = await apiClient.post("/personnel", data);
+    return response.data;
+  },
+  
+  update: async (id: string, data: any) => {
+    const response = await apiClient.put(`/personnel/${id}`, data);
+    return response.data;
+  },
+  
+  updateStatus: async (id: string, status: string) => {
+    const response = await apiClient.patch(`/personnel/${id}/status`, { status });
+    return response.data;
+  },
+};
+
+// ==================== SAMPLES API ====================
+export const samplesApi = {
+  getAll: async (params?: any) => {
+    const response = await apiClient.get("/samples", { params });
+    return response.data;
+  },
+  
+  getById: async (id: string) => {
+    const response = await apiClient.get(`/samples/${id}`);
+    return response.data;
+  },
+  
+  create: async (data: any) => {
+    const response = await apiClient.post("/samples", data);
+    return response.data;
+  },
+  
+  update: async (id: string, data: any) => {
+    const response = await apiClient.put(`/samples/${id}`, data);
+    return response.data;
+  },
+  
+  updateStatus: async (id: string, status: string) => {
+    const response = await apiClient.patch(`/samples/${id}/status`, { status });
+    return response.data;
+  },
+};
+
+// ==================== AUTH API ====================
+export const authApi = {
+  login: async (username: string, password: string) => {
+    const response = await apiClient.post("/auth/login", { username, password });
+    if (response.data.token) {
+      localStorage.setItem("token", response.data.token);
+    }
+    return response.data;
+  },
+  
+  logout: async () => {
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  },
+  
+  getCurrentUser: async () => {
+    const response = await apiClient.get("/auth/me");
+    return response.data;
+  },
+
+    me: async () => {
+    const response = await apiClient.get("/auth/me");
+    return response.data;
+  },
+};
+
+// ==================== DASHBOARD/STATS API ====================
+export const dashboardApi = {
+  getStats: async () => {
+    const response = await apiClient.get("/dashboard/stats");
+    return response.data;
+  },
+  
+  getProductionTrend: async (days: number = 7) => {
+    const response = await apiClient.get("/dashboard/production-trend", {
+      params: { days },
+    });
+    return response.data;
+  },
+  
+  getInventoryStatus: async () => {
+    const response = await apiClient.get("/dashboard/inventory-status");
+    return response.data;
+  },
 };
 
 export default apiClient;
