@@ -1,7 +1,13 @@
-import axios from "axios";
+import axios, { AxiosInstance } from "axios";
 
 // API base URL - update this to match your backend
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
+// Extend AxiosInstance to include custom methods
+interface ExtendedAxiosInstance extends AxiosInstance {
+  setToken: (accessToken: string, refreshToken?: string) => void;
+  clearToken: () => void;
+}
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -9,7 +15,7 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-});
+}) as ExtendedAxiosInstance;
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
@@ -37,6 +43,19 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Add token management methods
+apiClient.setToken = (accessToken: string, refreshToken?: string) => {
+  localStorage.setItem("token", accessToken);
+  if (refreshToken) {
+    localStorage.setItem("refreshToken", refreshToken);
+  }
+};
+
+apiClient.clearToken = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+};
 
 // ==================== PRODUCTS API ====================
 export const productsApi = {
@@ -337,9 +356,6 @@ export const samplesApi = {
 export const authApi = {
   login: async (username: string, password: string) => {
     const response = await apiClient.post("/auth/login", { username, password });
-    if (response.data.token) {
-      localStorage.setItem("token", response.data.token);
-    }
     return response.data;
   },
   
@@ -353,7 +369,7 @@ export const authApi = {
     return response.data;
   },
 
-    me: async () => {
+  me: async () => {
     const response = await apiClient.get("/auth/me");
     return response.data;
   },
