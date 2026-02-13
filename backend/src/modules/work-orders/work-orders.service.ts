@@ -72,7 +72,6 @@ export class WorkOrdersService {
             },
           },
           order: true,
-          bomItem: true,
         },
         orderBy: { [sortBy]: sortOrder },
         skip: (page - 1) * limit,
