@@ -1,6 +1,6 @@
 // ============================================
 // UPDATED PRISMA SCHEMA - ERP SYSTEM V2
-// Tüm yeni özellikler dahil
+// Kod uyumluluğu için güncellenmiş
 // ============================================
 
 generator client {
@@ -24,7 +24,7 @@ model User {
   fullName          String?  @map("full_name")
   role              UserRole
   languagePreference String  @default("tr") @map("language_preference")
-  workshopId        String?  @map("workshop_id") // Hangi atölyede çalışıyor
+  workshopId        String?  @map("workshop_id")
   isActive          Boolean  @default(true) @map("is_active")
   lastLogin         DateTime? @map("last_login")
   createdAt         DateTime @default(now()) @map("created_at")
@@ -67,18 +67,17 @@ model Permission {
 }
 
 // ============================================
-// WORKSHOP (ATÖLYE)
+// WORKSHOP
 // ============================================
 
 model Workshop {
   id          String    @id @default(uuid())
   code        String    @unique
   name        String
-  type        String    // INJECTION, ASSEMBLY, PAINTING, PACKAGING, QUALITY_CONTROL
+  type        String
   isActive    Boolean   @default(true) @map("is_active")
   createdAt   DateTime  @default(now()) @map("created_at")
 
-  // Relations
   users       User[]
   workOrders  WorkOrder[]
 
@@ -99,12 +98,11 @@ model Product {
   maxStockLevel Decimal?    @db.Decimal(10, 3) @map("max_stock_level")
   allowNegativeStock Boolean @default(false) @map("allow_negative_stock")
   negativeStockLimit Decimal? @db.Decimal(10, 3) @map("negative_stock_limit")
-  moldId        String?     @map("mold_id") // Hangi kalıpla üretiliyor
+  moldId        String?     @map("mold_id")
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
   createdBy     String?     @map("created_by")
 
-  // Relations
   creator           User? @relation("CreatedBy", fields: [createdBy], references: [id])
   mold              Mold? @relation(fields: [moldId], references: [id])
   translations      ProductTranslation[]
@@ -142,28 +140,30 @@ model ProductTranslation {
   @@map("product_translations")
 }
 
+// ✅ FIXED: BomItem - scrapRate default 0, workOrders relation eklendi
 model BomItem {
   id            String   @id @default(uuid())
   parentId      String   @map("parent_id")
   childId       String   @map("child_id")
   quantity      Decimal  @db.Decimal(10, 4)
   unit          String   @default("PCS")
-  scrapRate     Decimal? @db.Decimal(5, 2) @map("scrap_rate")
+  scrapRate     Decimal  @default(0) @db.Decimal(5, 2) @map("scrap_rate")
   sequence      Int      @default(0)
   notes         String?
-  effectiveDate DateTime? @map("effective_date") @db.Date // Hangi tarihten itibaren geçerli
+  effectiveDate DateTime? @map("effective_date") @db.Date
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
 
-  parent Product @relation("ParentProduct", fields: [parentId], references: [id])
-  child  Product @relation("ChildProduct", fields: [childId], references: [id])
+  parent      Product @relation("ParentProduct", fields: [parentId], references: [id])
+  child       Product @relation("ChildProduct", fields: [childId], references: [id])
+  workOrders  WorkOrder[]
 
   @@unique([parentId, childId, effectiveDate])
   @@map("bom_items")
 }
 
 // ============================================
-// WAREHOUSE & LOCATION (YENİ)
+// WAREHOUSE & LOCATION
 // ============================================
 
 model Warehouse {
@@ -174,7 +174,6 @@ model Warehouse {
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
 
-  // Relations
   zones     WarehouseZone[]
   locations WarehouseLocation[]
 
@@ -184,11 +183,10 @@ model Warehouse {
 model WarehouseZone {
   id          String   @id @default(uuid())
   warehouseId String   @map("warehouse_id")
-  code        String   // A, B, C
+  code        String
   name        String
   isActive    Boolean  @default(true) @map("is_active")
 
-  // Relations
   warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
   locations WarehouseLocation[]
 
@@ -200,14 +198,13 @@ model WarehouseLocation {
   id               String   @id @default(uuid())
   warehouseId      String   @map("warehouse_id")
   zoneId           String?  @map("zone_id")
-  code             String   // A1-R1-01
-  fullCode         String   @map("full_code") // ANA-A-A1-R1-01
-  locationType     String   @map("location_type") // PALLET, SHELF, FLOOR, RACK
+  code             String
+  fullCode         String   @map("full_code")
+  locationType     String   @map("location_type")
   capacity         Decimal? @db.Decimal(10, 3)
   currentOccupancy Decimal  @default(0) @db.Decimal(10, 3) @map("current_occupancy")
   isActive         Boolean  @default(true) @map("is_active")
 
-  // Relations
   warehouse        Warehouse @relation(fields: [warehouseId], references: [id])
   zone             WarehouseZone? @relation(fields: [zoneId], references: [id])
   inventoryLots    InventoryLot[]
@@ -229,7 +226,6 @@ model LocationTransfer {
   reason         String?
   userId         String   @map("user_id")
 
-  // Relations
   lot          InventoryLot @relation(fields: [lotId], references: [id])
   fromLocation WarehouseLocation? @relation("FromLocation", fields: [fromLocationId], references: [id])
   toLocation   WarehouseLocation @relation("ToLocation", fields: [toLocationId], references: [id])
@@ -241,27 +237,28 @@ model LocationTransfer {
 // INVENTORY & FIFO
 // ============================================
 
+// ✅ FIXED: InventoryLot - ACTIVE enum eklendi, initialQuantity eklendi
 model InventoryLot {
   id               String              @id @default(uuid())
   lotNumber        String              @unique @map("lot_number")
   productId        String              @map("product_id")
+  initialQuantity  Decimal             @db.Decimal(10, 3) @map("initial_quantity")
   quantity         Decimal             @db.Decimal(10, 3)
   unitCost         Decimal?            @db.Decimal(10, 4) @map("unit_cost")
   currency         String              @default("TRY")
   supplierId       String?             @map("supplier_id")
-  locationId       String?             @map("location_id") // YENİ: Hangi lokasyonda
-  moldId           String?             @map("mold_id")     // YENİ: Hangi kalıpla üretildi
+  locationId       String?             @map("location_id")
+  moldId           String?             @map("mold_id")
   receivedDate     DateTime            @db.Date @map("received_date")
   expiryDate       DateTime?           @db.Date @map("expiry_date")
-  status           InventoryLotStatus  @default(AVAILABLE) // YENİ
-  qualityStatus    String?             @map("quality_status") // APPROVED, QUARANTINE, REJECTED
+  status           InventoryLotStatus  @default(AVAILABLE)
+  qualityStatus    String?             @map("quality_status")
   workOrderId      String?             @map("work_order_id")
   purchaseOrderId  String?             @map("purchase_order_id")
   batchNumber      String?             @map("batch_number")
   notes            String?
   createdAt        DateTime            @default(now()) @map("created_at")
 
-  // Relations
   product       Product @relation(fields: [productId], references: [id])
   supplier      Supplier? @relation(fields: [supplierId], references: [id])
   location      WarehouseLocation? @relation(fields: [locationId], references: [id])
@@ -279,6 +276,7 @@ model InventoryLot {
 }
 
 enum InventoryLotStatus {
+  ACTIVE
   AVAILABLE
   RESERVED
   IN_PRODUCTION
@@ -287,19 +285,23 @@ enum InventoryLotStatus {
   SCRAPPED
 }
 
+// ✅ FIXED: InventoryTransaction - transactionType ve referenceType eklendi
 model InventoryTransaction {
-  id            String   @id @default(uuid())
-  lotId         String   @map("lot_id")
-  type          String   // IN, OUT, ADJUSTMENT, TRANSFER, SCRAP
-  quantity      Decimal  @db.Decimal(10, 3)
-  beforeQuantity Decimal @db.Decimal(10, 3) @map("before_quantity")
-  afterQuantity  Decimal @db.Decimal(10, 3) @map("after_quantity")
-  workOrderId   String?  @map("work_order_id")
-  orderId       String?  @map("order_id")
-  userId        String   @map("user_id")
-  reason        String?
-  notes         String?
-  createdAt     DateTime @default(now()) @map("created_at")
+  id              String   @id @default(uuid())
+  lotId           String   @map("lot_id")
+  transactionType String   @map("transaction_type")
+  type            String
+  quantity        Decimal  @db.Decimal(10, 3)
+  beforeQuantity  Decimal  @db.Decimal(10, 3) @map("before_quantity")
+  afterQuantity   Decimal  @db.Decimal(10, 3) @map("after_quantity")
+  workOrderId     String?  @map("work_order_id")
+  orderId         String?  @map("order_id")
+  referenceType   String?  @map("reference_type")
+  referenceId     String?  @map("reference_id")
+  userId          String   @map("user_id")
+  reason          String?
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
 
   lot       InventoryLot @relation(fields: [lotId], references: [id])
   workOrder WorkOrder? @relation(fields: [workOrderId], references: [id])
@@ -325,7 +327,7 @@ model LotAllocation {
 }
 
 // ============================================
-// STOCK REVISION (YENİ)
+// STOCK REVISION
 // ============================================
 
 model StockRevision {
@@ -337,15 +339,14 @@ model StockRevision {
   systemQuantity  Decimal  @db.Decimal(10, 3) @map("system_quantity")
   countedQuantity Decimal  @db.Decimal(10, 3) @map("counted_quantity")
   difference      Decimal  @db.Decimal(10, 3)
-  reason          String   // PERIODIC_COUNT, WASTE, LOSS, DAMAGE, CORRECTION
+  reason          String
   notes           String?
   revisedBy       String   @map("revised_by")
   approvedBy      String?  @map("approved_by")
   approvalDate    DateTime? @map("approval_date")
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  status          String   @default("PENDING")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  // Relations
   reviser  User @relation("RevisedBy", fields: [revisedBy], references: [id])
   approver User? @relation("ApprovedBy", fields: [approvedBy], references: [id])
 
@@ -353,7 +354,7 @@ model StockRevision {
 }
 
 // ============================================
-// MOLD TRACKING (YENİ)
+// MOLD TRACKING
 // ============================================
 
 model Mold {
@@ -362,7 +363,7 @@ model Mold {
   name                String
   cavityCount         Int      @map("cavity_count")
   cycleTimeSeconds    Int?     @map("cycle_time_seconds")
-  ownership           String   // OWN, CUSTOMER
+  ownership           String
   status              MoldStatus @default(ACTIVE)
   locationId          String?  @map("location_id")
   totalShots          Int      @default(0) @map("total_shots")
@@ -376,7 +377,6 @@ model Mold {
   isActive            Boolean  @default(true) @map("is_active")
   createdAt           DateTime @default(now()) @map("created_at")
 
-  // Relations
   location     WarehouseLocation? @relation(fields: [locationId], references: [id])
   products     Product[]
   maintenance  MoldMaintenance[]
@@ -398,7 +398,7 @@ model MoldMaintenance {
   id                    String   @id @default(uuid())
   moldId                String   @map("mold_id")
   maintenanceDate       DateTime @db.Date @map("maintenance_date")
-  maintenanceType       String   @map("maintenance_type") // PREVENTIVE, CORRECTIVE, CLEANING
+  maintenanceType       String   @map("maintenance_type")
   shotCountAtMaintenance Int     @map("shot_count_at_maintenance")
   description           String?
   cost                  Decimal? @db.Decimal(10, 2)
@@ -406,7 +406,6 @@ model MoldMaintenance {
   notes                 String?
   createdAt             DateTime @default(now()) @map("created_at")
 
-  // Relations
   mold Mold @relation(fields: [moldId], references: [id])
 
   @@map("mold_maintenance")
@@ -422,7 +421,6 @@ model MoldUsage {
   defectCount    Int      @default(0) @map("defect_count")
   notes          String?
 
-  // Relations
   mold      Mold @relation(fields: [moldId], references: [id])
   workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
 
@@ -433,33 +431,36 @@ model MoldUsage {
 // WORK ORDERS
 // ============================================
 
+// ✅ FIXED: WorkOrder - bomItemId, priority Int, isOutsourced eklendi
 model WorkOrder {
   id                 String          @id @default(uuid())
   woNumber           String          @unique @map("wo_number")
   productId          String          @map("product_id")
+  bomItemId          String?         @map("bom_item_id")
   orderId            String?         @map("order_id")
-  workshopId         String?         @map("workshop_id") // YENİ: Hangi atölyede
+  workshopId         String?         @map("workshop_id")
   plannedQuantity    Decimal         @db.Decimal(10, 3) @map("planned_quantity")
   producedQuantity   Decimal         @default(0) @db.Decimal(10, 3) @map("produced_quantity")
   scrapQuantity      Decimal         @default(0) @db.Decimal(10, 3) @map("scrap_quantity")
   status             WorkOrderStatus @default(PLANNED)
-  priority           String          @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  priority           Int             @default(5)
   machineId          String?         @map("machine_id")
-  supplierId         String?         @map("supplier_id") // Fason için
+  supplierId         String?         @map("supplier_id")
   plannedStartDate   DateTime?       @db.Date @map("planned_start_date")
   plannedEndDate     DateTime?       @db.Date @map("planned_end_date")
   actualStartDate    DateTime?       @map("actual_start_date")
   actualEndDate      DateTime?       @map("actual_end_date")
   estimatedDuration  Int?            @map("estimated_duration")
-  allowBomChanges    Boolean         @default(true) @map("allow_bom_changes") // YENİ
-  partialCloseReason String?         @map("partial_close_reason") // YENİ
-  partialCloseDate   DateTime?       @map("partial_close_date")   // YENİ
+  isOutsourced       Boolean         @default(false) @map("is_outsourced")
+  allowBomChanges    Boolean         @default(true) @map("allow_bom_changes")
+  partialCloseReason String?         @map("partial_close_reason")
+  partialCloseDate   DateTime?       @map("partial_close_date")
   notes              String?
   createdAt          DateTime        @default(now()) @map("created_at")
   createdBy          String?         @map("created_by")
 
-  // Relations
   product       Product @relation(fields: [productId], references: [id])
+  bomItem       BomItem? @relation(fields: [bomItemId], references: [id])
   order         Order? @relation(fields: [orderId], references: [id])
   workshop      Workshop? @relation(fields: [workshopId], references: [id])
   machine       Machine? @relation(fields: [machineId], references: [id])
@@ -502,14 +503,19 @@ model WorkOrderMaterial {
   @@map("work_order_materials")
 }
 
+// ✅ FIXED: WorkOrderOperation - operationSequence, quantityCompleted, startTime, endTime eklendi
 model WorkOrderOperation {
-  id           String   @id @default(uuid())
-  workOrderId  String   @map("work_order_id")
-  operationType String  @map("operation_type") // START, PAUSE, RESUME, COMPLETE, PRODUCTION_RECORD
-  quantity     Decimal? @db.Decimal(10, 3)
-  operatorId   String   @map("operator_id")
-  notes        String?
-  createdAt    DateTime @default(now()) @map("created_at")
+  id                String   @id @default(uuid())
+  workOrderId       String   @map("work_order_id")
+  operationSequence Int      @map("operation_sequence")
+  operationType     String   @map("operation_type")
+  quantity          Decimal? @db.Decimal(10, 3)
+  quantityCompleted Decimal? @db.Decimal(10, 3) @map("quantity_completed")
+  operatorId        String   @map("operator_id")
+  startTime         DateTime? @map("start_time")
+  endTime           DateTime? @map("end_time")
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
 
   workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   operator  User @relation(fields: [operatorId], references: [id])
@@ -518,7 +524,7 @@ model WorkOrderOperation {
 }
 
 // ============================================
-// QUALITY CONTROL (YENİ)
+// QUALITY CONTROL
 // ============================================
 
 model QualityMeasurement {
@@ -527,14 +533,13 @@ model QualityMeasurement {
   measurementTime   DateTime @default(now()) @map("measurement_time")
   measuredBy        String   @map("measured_by")
   sampleSize        Int      @map("sample_size")
-  parametersJson    Json     @map("parameters_json") // {length: {value, min, max, pass}, weight: {...}}
-  overallResult     String   // PASS, FAIL, CONDITIONAL
+  parametersJson    Json     @map("parameters_json")
+  overallResult     String
   defectCount       Int      @default(0) @map("defect_count")
-  defectTypes       String?  @map("defect_types") // JSON array
+  defectTypes       String?  @map("defect_types")
   notes             String?
   createdAt         DateTime @default(now()) @map("created_at")
 
-  // Relations
   workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
   measurer  User @relation(fields: [measuredBy], references: [id])
   defects   QualityDefect[]
@@ -554,11 +559,10 @@ model FinalInspection {
   measurementsJson     Json?    @map("measurements_json")
   visualInspectionPass Boolean  @map("visual_inspection_pass")
   functionalTestPass   Boolean  @map("functional_test_pass")
-  overallResult        String   // APPROVED, REJECTED, CONDITIONAL
+  overallResult        String
   photos               String[] @default([])
   notes                String?
 
-  // Relations
   lot         InventoryLot @relation(fields: [lotId], references: [id])
   workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id])
   inspector   User @relation(fields: [inspectedBy], references: [id])
@@ -571,14 +575,13 @@ model QualityDefect {
   id                   String   @id @default(uuid())
   measurementId        String?  @map("measurement_id")
   inspectionId         String?  @map("inspection_id")
-  defectType           String   @map("defect_type") // SCRATCH, DISCOLORATION, DIMENSION, CRACK, etc.
-  severity             String   // MINOR, MAJOR, CRITICAL
+  defectType           String   @map("defect_type")
+  severity             String
   quantity             Int
   description          String?
   photo                String?
   createdAt            DateTime @default(now()) @map("created_at")
 
-  // Relations
   measurement QualityMeasurement? @relation(fields: [measurementId], references: [id])
   inspection  FinalInspection? @relation(fields: [inspectionId], references: [id])
 
@@ -599,7 +602,6 @@ model Machine {
   isActive         Boolean  @default(true) @map("is_active")
   createdAt        DateTime @default(now()) @map("created_at")
 
-  // Relations
   translations     MachineTranslation[]
   shifts           MachineShift[]
   maintenance      MachineMaintenance[]
@@ -659,21 +661,20 @@ model MachineMaintenance {
 }
 
 // ============================================
-// PERSONNEL & CAPACITY (YENİ)
+// PERSONNEL & CAPACITY
 // ============================================
 
 model Personnel {
   id            String   @id @default(uuid())
   code          String   @unique
   name          String
-  position      String   // OPERATOR, SUPERVISOR, QUALITY_CONTROL
-  shift         String   // DAY, NIGHT, ROTATING
+  position      String
+  shift         String
   weeklyHours   Int      @map("weekly_hours")
-  skills        Json?    // {machines: ["MACH-01", "MACH-02"], operations: ["ASSEMBLY"]}
+  skills        Json?
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
 
-  // Relations
   capacities PersonnelCapacity[]
 
   @@map("personnel")
@@ -688,7 +689,6 @@ model PersonnelCapacity {
   actualHours   Decimal  @default(0) @db.Decimal(5, 2) @map("actual_hours")
   overtimeHours Decimal  @default(0) @db.Decimal(5, 2) @map("overtime_hours")
 
-  // Relations
   personnel Personnel @relation(fields: [personnelId], references: [id])
 
   @@unique([personnelId, year, weekNumber])
@@ -696,7 +696,7 @@ model PersonnelCapacity {
 }
 
 // ============================================
-// PURCHASE ORDERS (YENİ)
+// PURCHASE ORDERS
 // ============================================
 
 model PurchaseOrder {
@@ -712,7 +712,6 @@ model PurchaseOrder {
   notes                String?
   createdAt            DateTime @default(now()) @map("created_at")
 
-  // Relations
   supplier      Supplier @relation(fields: [supplierId], references: [id])
   items         PurchaseOrderItem[]
   confirmations PurchaseOrderConfirmation[]
@@ -739,7 +738,6 @@ model PurchaseOrderItem {
   receivedDate     DateTime? @db.Date @map("received_date")
   notes            String?
 
-  // Relations
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   product       Product @relation(fields: [productId], references: [id])
 
@@ -753,11 +751,10 @@ model PurchaseOrderConfirmation {
   confirmedBy     String?  @map("confirmed_by")
   isRevised       Boolean  @default(false) @map("is_revised")
   revisionNotes   String?  @map("revision_notes")
-  status          String   // CONFIRMED, REVISED, REJECTED
+  status          String
   documentUrl     String?  @map("document_url")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  // Relations
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
 
   @@map("purchase_order_confirmations")
@@ -774,14 +771,13 @@ model Order {
   orderDate    DateTime    @db.Date @map("order_date")
   deliveryDate DateTime?   @db.Date @map("delivery_date")
   status       OrderStatus @default(PENDING)
-  confirmationStatus String? @map("confirmation_status") // YENİ: QUOTATION, AWAITING, CONFIRMED
+  confirmationStatus String? @map("confirmation_status")
   totalAmount  Decimal?    @db.Decimal(12, 2) @map("total_amount")
   currency     String      @default("TRY")
   notes        String?
   createdAt    DateTime    @default(now()) @map("created_at")
   createdBy    String?     @map("created_by")
 
-  // Relations
   customer          Customer @relation(fields: [customerId], references: [id])
   creator           User? @relation("CreatedBy", fields: [createdBy], references: [id])
   items             OrderItem[]
@@ -812,7 +808,6 @@ model OrderItem {
   deliveredQuantity Decimal @default(0) @db.Decimal(10, 3) @map("delivered_quantity")
   notes             String?
 
-  // Relations
   order         Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product       Product @relation(fields: [productId], references: [id])
   shipmentItems ShipmentItem[]
@@ -827,12 +822,11 @@ model OrderConfirmation {
   quotationNumber         String?  @map("quotation_number")
   customerConfirmationDate DateTime? @db.Date @map("customer_confirmation_date")
   confirmedBy             String?  @map("confirmed_by")
-  status                  String   @default("QUOTATION") // QUOTATION, AWAITING, CONFIRMED, CANCELLED
+  status                  String   @default("QUOTATION")
   documentUrl             String?  @map("document_url")
   notes                   String?
   createdAt               DateTime @default(now()) @map("created_at")
 
-  // Relations
   order Order @relation(fields: [orderId], references: [id])
 
   @@map("order_confirmations")
@@ -847,7 +841,6 @@ model OrderStatusHistory {
   changedBy    String?  @map("changed_by")
   reason       String?
 
-  // Relations
   order Order @relation(fields: [orderId], references: [id])
 
   @@map("order_status_history")
@@ -866,7 +859,6 @@ model Customer {
   isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at")
 
-  // Relations
   orders    Order[]
   shipments Shipment[]
   sampleRequests SampleRequest[]
@@ -892,7 +884,6 @@ model Supplier {
   isActive      Boolean      @default(true) @map("is_active")
   createdAt     DateTime     @default(now()) @map("created_at")
 
-  // Relations
   inventoryLots     InventoryLot[]
   workOrders        WorkOrder[]
   outsourcingJobs   OutsourcingJob[]
@@ -913,7 +904,7 @@ model OutsourcingJob {
   workOrderId        String?              @map("work_order_id")
   supplierId         String               @map("supplier_id")
   productId          String               @map("product_id")
-  processType        String               @map("process_type") // PAINTING, ASSEMBLY, MACHINING
+  processType        String               @map("process_type")
   sentQuantity       Decimal              @db.Decimal(10, 3) @map("sent_quantity")
   receivedQuantity   Decimal              @default(0) @db.Decimal(10, 3) @map("received_quantity")
   sentDate           DateTime?            @db.Date @map("sent_date")
@@ -924,7 +915,6 @@ model OutsourcingJob {
   notes              String?
   createdAt          DateTime             @default(now()) @map("created_at")
 
-  // Relations
   supplier  Supplier @relation(fields: [supplierId], references: [id])
   product   Product @relation(fields: [productId], references: [id])
 
@@ -958,7 +948,6 @@ model Shipment {
   createdAt      DateTime       @default(now()) @map("created_at")
   createdBy      String?        @map("created_by")
 
-  // Relations
   order    Order?   @relation(fields: [orderId], references: [id])
   customer Customer @relation(fields: [customerId], references: [id])
   items    ShipmentItem[]
@@ -981,7 +970,6 @@ model ShipmentItem {
   lotId       String  @map("lot_id")
   quantity    Decimal @db.Decimal(10, 3)
 
-  // Relations
   shipment  Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   orderItem OrderItem? @relation(fields: [orderItemId], references: [id])
   lot       InventoryLot @relation(fields: [lotId], references: [id])
@@ -990,7 +978,7 @@ model ShipmentItem {
 }
 
 // ============================================
-// SAMPLE & PROTOTYPE TRACKING (YENİ)
+// SAMPLE & PROTOTYPE TRACKING
 // ============================================
 
 model SampleRequest {
@@ -1006,7 +994,6 @@ model SampleRequest {
   notes             String?
   createdAt         DateTime @default(now()) @map("created_at")
 
-  // Relations
   customer    Customer @relation(fields: [customerId], references: [id])
   productions SampleProduction[]
   approvals   SampleApproval[]
@@ -1032,117 +1019,61 @@ model SampleProduction {
   producedQuantity Decimal @db.Decimal(10, 3) @map("produced_quantity")
   photos          String[] @default([])
   notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
 
-  // Relations
   sampleRequest SampleRequest @relation(fields: [sampleRequestId], references: [id])
 
   @@map("sample_productions")
 }
 
 model SampleApproval {
-  id               String   @id @default(uuid())
-  sampleRequestId  String   @map("sample_request_id")
-  approvalDate     DateTime @db.Date @map("approval_date")
-  approvalStatus   String   // APPROVED, REVISION, REJECTED
-  customerFeedback String?  @map("customer_feedback")
-  revisionNotes    String?  @map("revision_notes")
-  documentUrl      String?  @map("document_url")
+  id              String   @id @default(uuid())
+  sampleRequestId String   @map("sample_request_id")
+  approvalDate    DateTime @db.Date @map("approval_date")
+  approvedBy      String   @map("approved_by")
+  result          String
+  feedback        String?
+  createdAt       DateTime @default(now()) @map("created_at")
 
-  // Relations
   sampleRequest SampleRequest @relation(fields: [sampleRequestId], references: [id])
 
   @@map("sample_approvals")
 }
 
 // ============================================
-// REPORTING & AUTOMATION (YENİ)
+// AUDIT LOG & NOTIFICATIONS
 // ============================================
 
-model ReportSchedule {
-  id              String   @id @default(uuid())
-  reportType      String   @map("report_type") // WEEKLY_SUMMARY, STOCK_ALERT, PRODUCTION_SUMMARY
-  schedule        String   // CRON expression: "0 9 * * 1" (Every Monday 9 AM)
-  recipients      String[] // Email addresses
-  parameters      Json?    // Report-specific parameters
-  isActive        Boolean  @default(true) @map("is_active")
-  lastRun         DateTime? @map("last_run")
-  nextRun         DateTime? @map("next_run")
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  // Relations
-  exports ReportExport[]
-
-  @@map("report_schedules")
-}
-
-model ReportExport {
+model AuditLog {
   id          String   @id @default(uuid())
-  scheduleId  String?  @map("schedule_id")
-  reportType  String   @map("report_type")
-  format      String   @default("XLSX") // XLSX, PDF, CSV
-  fileUrl     String   @map("file_url")
-  parameters  Json?
-  generatedAt DateTime @default(now()) @map("generated_at")
-  generatedBy String?  @map("generated_by")
+  userId      String   @map("user_id")
+  action      String
+  module      String
+  recordId    String?  @map("record_id")
+  oldValues   Json?    @map("old_values")
+  newValues   Json?    @map("new_values")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  // Relations
-  schedule ReportSchedule? @relation(fields: [scheduleId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
-  @@map("report_exports")
+  @@index([userId, createdAt])
+  @@map("audit_logs")
 }
-
-// ============================================
-// SYSTEM SETTINGS (YENİ)
-// ============================================
-
-model SystemSettings {
-  id                  String   @id @default(uuid())
-  key                 String   @unique
-  value               String
-  dataType            String   @map("data_type") // STRING, NUMBER, BOOLEAN, JSON
-  category            String   // GENERAL, INVENTORY, PRODUCTION, QUALITY
-  description         String?
-  updatedAt           DateTime @updatedAt @map("updated_at")
-
-  @@map("system_settings")
-}
-
-// ============================================
-// NOTIFICATIONS & AUDIT
-// ============================================
 
 model Notification {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  type          String
-  severity      String
-  messageKey    String   @map("message_key")
-  messageParams Json?    @map("message_params")
-  referenceType String?  @map("reference_type")
-  referenceId   String?  @map("reference_id")
-  isRead        Boolean  @default(false) @map("is_read")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false) @map("is_read")
+  link      String?
+  createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, isRead, createdAt])
   @@map("notifications")
-}
-
-model AuditLog {
-  id         String   @id @default(uuid())
-  userId     String?  @map("user_id")
-  tableName  String   @map("table_name")
-  recordId   String?  @map("record_id")
-  action     String
-  oldValues  Json?    @map("old_values")
-  newValues  Json?    @map("new_values")
-  ipAddress  String?  @map("ip_address")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  user User? @relation(fields: [userId], references: [id])
-
-  @@index([userId, createdAt])
-  @@index([tableName, recordId])
-  @@map("audit_logs")
 }
